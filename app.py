@@ -26,8 +26,6 @@ calculator_type = st.sidebar.selectbox(
     ["One Time Investment", "SIP Calculator", "SWP Calculator"]
 )
 
-st.sidebar.markdown("---")
-
 
 def create_growth_chart_with_investment(df, amount_column, invested_column, title):
     """Create interactive growth chart with invested amount tracking"""
@@ -180,13 +178,6 @@ def format_currency(amount):
         return f"₹{amount:,.0f}"
     
 # Inflation adjustment option
-st.sidebar.markdown("### Optional Settings")
-use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
-inflation_rate = 0
-if use_inflation:
-    inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
-
-st.sidebar.markdown("---")
 
 # One Time Investment Calculator
 if calculator_type == "One Time Investment":
@@ -195,6 +186,13 @@ if calculator_type == "One Time Investment":
     principal = st.sidebar.number_input("Initial Investment (₹)", min_value=1000, value=100000, step=1000)
     rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 12.0, 0.1)
     years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
+
+    # Inflation Settings
+    st.sidebar.markdown("### 📊 Optional Settings")
+    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
+    inflation_rate = 0
+    if use_inflation:
+        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
 
     calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
 
@@ -253,6 +251,13 @@ elif calculator_type == "SIP Calculator":
     rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 12.0, 0.1)
     years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
 
+    # Inflation Settings
+    st.sidebar.markdown("### 📊 Optional Settings")
+    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
+    inflation_rate = 0
+    if use_inflation:
+        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
+
     calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
 
     # Main content area
@@ -308,6 +313,13 @@ elif calculator_type == "SWP Calculator":
     withdrawal_amount = st.sidebar.number_input("Monthly Withdrawal (₹)", min_value=1000, value=10000, step=1000)
     rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 10.0, 0.1)
     years = st.sidebar.slider("Withdrawal Period (Years)", 1, 30, 15)
+
+    # Inflation Settings
+    st.sidebar.markdown("### 📊 Optional Settings")
+    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
+    inflation_rate = 0
+    if use_inflation:
+        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
 
     calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
 
