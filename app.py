@@ -184,7 +184,7 @@ if calculator_type == "One Time Investment":
     # Sidebar inputs
     st.sidebar.markdown("### 💵 Input Parameters")
     principal = st.sidebar.number_input("Initial Investment (₹)", min_value=1000, value=100000, step=1000)
-    rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 12.0, 0.1)
+    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=12.0, step=0.1)
     years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
 
     # Inflation Settings
@@ -248,7 +248,7 @@ elif calculator_type == "SIP Calculator":
     # Sidebar inputs
     st.sidebar.markdown("### 📈 Input Parameters")
     monthly_investment = st.sidebar.number_input("Monthly SIP Amount (₹)", min_value=500, value=10000, step=500)
-    rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 12.0, 0.1)
+    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=12.0, step=0.1)
     years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
 
     # Inflation Settings
@@ -311,7 +311,7 @@ elif calculator_type == "SWP Calculator":
     st.sidebar.markdown("### 💸 Input Parameters")
     initial_amount = st.sidebar.number_input("Initial Investment (₹)", min_value=100000, value=1000000, step=10000)
     withdrawal_amount = st.sidebar.number_input("Monthly Withdrawal (₹)", min_value=1000, value=10000, step=1000)
-    rate = st.sidebar.slider("Expected Annual Return (%)", 1.0, 30.0, 10.0, 0.1)
+    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=10.0, step=0.1)
     years = st.sidebar.slider("Withdrawal Period (Years)", 1, 30, 15)
 
     # Inflation Settings
