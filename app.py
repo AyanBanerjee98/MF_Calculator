@@ -151,7 +151,7 @@ if calculator_type == "One Time Investment":
     with col3:
         years = st.number_input("Investment Duration (years)", min_value=1, max_value=60, value=15, step=1)
 
-    if st.button("Calculate", type="primary", use_container_width=True):
+    if st.button("Calculate", type="primary", use_container_width=False):
         # Calculate with new parameters
         df = calc.one_time_investment(
             principal=int(principal), 
@@ -200,7 +200,7 @@ elif calculator_type == "SIP Calculator":
     with col3:
         years = st.number_input("Investment Duration (years)", min_value=1, max_value=60, value=15, step=1)
 
-    if st.button("Calculate", type="primary", use_container_width=True):
+    if st.button("Calculate", type="primary", use_container_width=False):
         # Calculate with new parameters
         df = calc.sip_calculator(
             monthly_investment=int(monthly_investment), 
@@ -239,17 +239,17 @@ elif calculator_type == "SIP Calculator":
 elif calculator_type == "SWP Calculator":
     st.subheader("💸 SWP (Systematic Withdrawal Plan) Calculator")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         initial_amount = st.number_input("Initial Corpus (₹)", min_value=0, value=1000000, step=10000)
     with col2:
         withdrawal_amount = st.number_input("Monthly Withdrawal (₹)", min_value=0, value=10000, step=500)
     with col3:
         rate = st.number_input("Expected Return Rate (% p.a.)", min_value=0.0, max_value=30.0, value=12.0, step=0.25)
-    with col1:
+    with col4:
         years = st.number_input("Duration (years)", min_value=1, max_value=60, value=10, step=1)
 
-    if st.button("Calculate", type="primary", use_container_width=True):
+    if st.button("Calculate", type="primary", use_container_width=False):
         # Calculate with new parameters
         df = calc.swp_calculator(
             initial_amount=int(initial_amount), 
