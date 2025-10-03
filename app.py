@@ -26,359 +26,274 @@ calculator_type = st.sidebar.selectbox(
     ["One Time Investment", "SIP Calculator", "SWP Calculator"]
 )
 
+st.sidebar.markdown("---")
 
-def create_growth_chart_with_investment(df, amount_column, invested_column, title):
-    """Create interactive growth chart with invested amount tracking"""
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
+# Optional Settings
+with st.sidebar.expander("Optional: Adjust Inflation & CAGR"):
+    enable_inflation = st.checkbox("Enable Inflation Adjustment", value=False)
+    inflation_rate = st.number_input("Inflation rate (% per year)", min_value=0.0, max_value=20.0, value=6.0, step=0.25, disabled=not enable_inflation)
 
-    # Main growth line
-    fig.add_trace(
-        go.Scatter(
-            x=df['Year'],
-            y=df[amount_column],
-            mode='lines+markers',
-            name='Portfolio Value',
-            line=dict(color='#1f77b4', width=3),
-            marker=dict(size=8),
-            hovertemplate='<b>Year:</b> %{x}<br><b>Portfolio Value:</b> ₹%{y:,.0f}<extra></extra>'
-        ),
-        secondary_y=False,
-    )
+with st.sidebar.expander("Optional: Step-up Investment/Withdrawal", expanded=False):
+    enable_increase = st.checkbox("Enable step-up / periodic increase", value=False)
+    increase_frequency = st.selectbox("Increase frequency", ["Yearly", "Every 3 years", "Every 5 years"], index=0, disabled=not enable_increase)
 
-    # Invested amount line (only for SIP)
-    if invested_column in df.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=df['Year'],
-                y=df[invested_column],
-                mode='lines+markers',
-                name='Total Invested',
-                line=dict(color='#ff7f0e', width=3, dash='dot'),
-                marker=dict(size=6),
-                hovertemplate='<b>Year:</b> %{x}<br><b>Total Invested:</b> ₹%{y:,.0f}<extra></extra>'
-            ),
-            secondary_y=False,
-        )
+    # Different controls for SIP/SWP vs One-time
+    if calculator_type == "SIP Calculator":
+        increase_percentage = st.number_input("Increase SIP by (%) when frequency triggers", min_value=0.0, max_value=200.0, value=10.0, step=1.0, disabled=not enable_increase)
+        increase_amount = None
+    elif calculator_type == "SWP Calculator":
+        increase_percentage = st.number_input("Increase Withdrawal by (%) when frequency triggers", min_value=0.0, max_value=200.0, value=10.0, step=1.0, disabled=not enable_increase)
+        increase_amount = None
+    else:  # One-time
+        increase_percentage = None
+        increase_amount = st.number_input("Additional one-time contribution (₹) when frequency triggers", min_value=0, max_value=1_00_00_000, value=50000, step=1_000, disabled=not enable_increase)
 
-    # Inflation adjusted line if available
-    if 'Real Value (Inflation Adjusted)' in df.columns and df['Real Value (Inflation Adjusted)'].notna().any():
-        fig.add_trace(
-            go.Scatter(
-                x=df['Year'],
-                y=df['Real Value (Inflation Adjusted)'],
-                mode='lines+markers',
-                name='Inflation Adjusted Value',
-                line=dict(color='#2ca02c', width=2, dash='dash'),
-                marker=dict(size=6),
-                hovertemplate='<b>Year:</b> %{x}<br><b>Real Value:</b> ₹%{y:,.0f}<extra></extra>'
-            ),
-            secondary_y=False,
-        )
+# Helper functions
+def pretty_num(n):
+    """Format number as currency"""
+    return f"₹{int(n):,}"
+
+def create_growth_chart(df, y_cols, title):
+    """Create interactive growth chart"""
+    fig = go.Figure()
+    for col in y_cols:
+        if col in df.columns and df[col].notna().any():
+            fig.add_trace(go.Scatter(
+                x=df['Year'], 
+                y=df[col], 
+                mode='lines+markers', 
+                name=col,
+                line=dict(width=3)
+            ))
 
     fig.update_layout(
         title=title,
-        hovermode='x unified',
+        xaxis_title='Year',
+        yaxis_title='Amount (₹)',
         template='plotly_white',
-        height=500,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
+        legend=dict(orientation='h', yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=500
     )
-
-    fig.update_xaxes(title_text="Year")
-    fig.update_yaxes(title_text="Amount (₹)", secondary_y=False)
-
     return fig
 
-def create_pie_chart(invested, gains, title):
-    """Create interactive pie chart for investment breakdown"""
-    labels = ['Principal/Invested Amount', 'Gains/Returns']
-    values = [invested, gains]
-    colors = ['#ff9999', '#66b3ff']
+def investment_summary_block(df, calculator_type):
+    """Display investment summary for the final year"""
+    summary_row = df.iloc[-1]
+    year = int(summary_row['Year'])
 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.4,  # Increased hole size for a donut-style chart
-        marker=dict(colors=colors, line=dict(color='white', width=2)),  # Add border for better contrast
-        textinfo='label+percent',
-        texttemplate='<b>%{label}</b><br>₹%{value:,.0f}<br>(%{percent})',
-        hovertemplate='<b>%{label}</b><br>Amount: ₹%{value:,.0f}<br>Percentage: %{percent}<extra></extra>'
-    )])
+    st.subheader(f"📊 Investment Summary for {year}")
 
-    fig.update_layout(
-        title=dict(
-            text=title,
-            font=dict(size=18, color='#333'),
-            x=0.5,  # Center the title
-        ),
-        template='plotly_white',
-        height=400,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.2,  # Adjusted position for better spacing
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12)
-        )
-    )
+    col1, col2, col3, col4 = st.columns(4)
 
-    return fig
+    if calculator_type == "One Time Investment":
+        final_amount = summary_row.get('Final Amount', 0)
+        total_principal = summary_row.get('Total Principal', 0)
+        interest_earned = summary_row.get('Interest Earned', 0)
+        interest_percent = summary_row.get('Interest Percent', 0)
 
-def create_swp_pie_chart(remaining, withdrawn, title):
-    """Create pie chart for SWP showing remaining vs withdrawn"""
-    labels = ['Remaining Balance', 'Total Withdrawn']
-    values = [remaining, withdrawn]
-    colors = ['#90EE90', '#FFB6C1']
+        with col1:
+            st.metric("Final Amount", pretty_num(final_amount))
+        with col2:
+            st.metric("Total Principal", pretty_num(total_principal))
+        with col3:
+            st.metric("Interest Earned", pretty_num(interest_earned))
+        with col4:
+            st.metric("Interest %", f"{interest_percent:.1f}%")
 
-    fig = go.Figure(data=[go.Pie(
-        labels=labels,
-        values=values,
-        hole=0.4,  # Increased hole size for a donut-style chart
-        marker=dict(colors=colors, line=dict(color='white', width=2)),  # Add border for better contrast
-        textinfo='label+percent',
-        texttemplate='<b>%{label}</b><br>₹%{value:,.0f}<br>(%{percent})',
-        hovertemplate='<b>%{label}</b><br>Amount: ₹%{value:,.0f}<br>Percentage: %{percent}<extra></extra>'
-    )])
+    elif calculator_type == "SIP Calculator":
+        final_amount = summary_row.get('Final Amount', 0)
+        total_invested = summary_row.get('Total Invested', 0)
+        gains = summary_row.get('Gains', 0)
+        gains_percent = summary_row.get('Gains Percent', 0)
 
-    fig.update_layout(
-        title=dict(
-            text=title,
-            font=dict(size=18, color='#333'),
-            x=0.5,  # Center the title
-        ),
-        template='plotly_white',
-        height=400,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.2,  # Adjusted position for better spacing
-            xanchor="center",
-            x=0.5,
-            font=dict(size=12)
-        )
-    )
+        with col1:
+            st.metric("Final Amount", pretty_num(final_amount))
+        with col2:
+            st.metric("Total Invested", pretty_num(total_invested))
+        with col3:
+            st.metric("Total Gains", pretty_num(gains))
+        with col4:
+            st.metric("Gains %", f"{gains_percent:.1f}%")
 
-    return fig
+    else:  # SWP Calculator
+        remaining_balance = summary_row.get('Remaining Balance', 0)
+        total_withdrawn = summary_row.get('Total Withdrawn', 0)
+        monthly_withdrawal = summary_row.get('Monthly Withdrawal', 0)
 
-def format_currency(amount):
-    """Format currency in Indian format"""
-    if amount >= 10000000:  # 1 crore
-        return f"₹{amount/10000000:.2f} Cr"
-    elif amount >= 100000:  # 1 lakh
-        return f"₹{amount/100000:.2f} L"
-    else:
-        return f"₹{amount:,.0f}"
-    
-# Inflation adjustment option
+        with col1:
+            st.metric("Remaining Balance", pretty_num(remaining_balance))
+        with col2:
+            st.metric("Total Withdrawn", pretty_num(total_withdrawn))
+        with col3:
+            st.metric("Monthly Withdrawal", pretty_num(monthly_withdrawal))
+        with col4:
+            st.metric("Years Completed", f"{len(df)}")
 
-# One Time Investment Calculator
+    # Real value if inflation is considered and enabled
+    if enable_inflation:
+        if 'Real Value (Inflation Adjusted)' in summary_row and pd.notnull(summary_row['Real Value (Inflation Adjusted)']):
+            st.info(f"💡 **Real Value (Inflation Adjusted):** {pretty_num(summary_row['Real Value (Inflation Adjusted)'])}")
+        elif 'Real Balance (Inflation Adjusted)' in summary_row and pd.notnull(summary_row['Real Balance (Inflation Adjusted)']):
+            st.info(f"💡 **Real Balance (Inflation Adjusted):** {pretty_num(summary_row['Real Balance (Inflation Adjusted)'])}")
+
+    st.markdown("---")
+
+
+# Main calculator sections
 if calculator_type == "One Time Investment":
-    # Sidebar inputs
-    st.sidebar.markdown("### 💵 Input Parameters")
-    principal = st.sidebar.number_input("Initial Investment (₹)", min_value=1000, value=100000, step=1000)
-    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=12.0, step=0.1)
-    years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
+    st.subheader("💰 One Time Investment Calculator")
 
-    # Inflation Settings
-    st.sidebar.markdown("### 📊 Optional Settings")
-    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
-    inflation_rate = 0
-    if use_inflation:
-        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        principal = st.number_input("Initial Investment (₹)", min_value=0, value=100000, step=5000)
+    with col2:
+        rate = st.number_input("Expected Return Rate (% p.a.)", min_value=0.0, max_value=30.0, value=12.0, step=0.25)
+    with col3:
+        years = st.number_input("Investment Duration (years)", min_value=1, max_value=60, value=15, step=1)
 
-    calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
+    if st.button("Calculate", type="primary", use_container_width=True):
+        # Calculate with new parameters
+        df = calc.one_time_investment(
+            principal=int(principal), 
+            rate=float(rate), 
+            years=int(years),
+            inflation_rate=float(inflation_rate),
+            enable_increase=bool(enable_increase),
+            increase_frequency=increase_frequency,
+            increase_amount=float(increase_amount) if increase_amount is not None else 0.0
+        )
 
-    # Main content area
-    st.header("💵 One Time Investment Calculator")
+        # 1. Display summary
+        investment_summary_block(df, calculator_type)
 
-    if calculate_button:
-        st.session_state.oti_calculated = True
-        st.session_state.oti_results = calc.one_time_investment(principal, rate, years, inflation_rate)
-        st.session_state.oti_principal = principal
+        # 2. Display growth chart
+        chart_cols = ["Final Amount", "Total Principal"]
+        if enable_inflation and inflation_rate > 0:
+            chart_cols.append("Real Value (Inflation Adjusted)")
 
-    if hasattr(st.session_state, 'oti_calculated') and st.session_state.oti_calculated:
-        results = st.session_state.oti_results
-        principal = st.session_state.oti_principal
+        st.plotly_chart(
+            create_growth_chart(
+                df, 
+                chart_cols, 
+                "One-time Investment Growth Over Time"
+            ), 
+            use_container_width=True
+        )
 
-        # Summary metrics
-        final_amount = results.iloc[-1]['Final Amount']
-        total_gains = final_amount - principal
-        cagr = calc.calculate_cagr(principal, final_amount, years)
+        # 3. Display data table
+        st.subheader("📈 Year-wise Growth Details")
+        # Remove the index column for cleaner display
+        df_display = df.copy()
+        if not enable_inflation:
+            df_display = df_display.drop(columns=["Real Value (Inflation Adjusted)"], errors="ignore")
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        col2a, col2b, col2c = st.columns(3)
-        with col2a:
-            st.metric("Final Amount", format_currency(final_amount))
-        with col2b:
-            st.metric("Total Gains", format_currency(total_gains))
-        with col2c:
-            st.metric("CAGR", f"{cagr:.2f}%")
 
-        # Create two columns for charts
-        chart_col1, chart_col2 = st.columns(2)
-
-        with chart_col1:
-            # Growth chart
-            fig_growth = create_growth_chart_with_investment(results, 'Final Amount', None, 'Investment Growth Over Time')
-            st.plotly_chart(fig_growth, use_container_width=True)
-
-        with chart_col2:
-            # Pie chart
-            fig_pie = create_pie_chart(principal, total_gains, 'Investment Breakdown')
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        # Results table
-        st.subheader("Detailed Breakdown")
-        display_cols = ['Period', 'Year', 'Final Amount', 'Interest Percent']
-        if inflation_rate > 0:
-            display_cols.append('Real Value (Inflation Adjusted)')
-        st.dataframe(results[display_cols], use_container_width=True)
-    else:
-        st.info("👈 Please enter your investment parameters in the sidebar and click 'Calculate' to see results.")
-
-# SIP Calculator
 elif calculator_type == "SIP Calculator":
-    # Sidebar inputs
-    st.sidebar.markdown("### 📈 Input Parameters")
-    monthly_investment = st.sidebar.number_input("Monthly SIP Amount (₹)", min_value=500, value=10000, step=500)
-    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=12.0, step=0.1)
-    years = st.sidebar.slider("Investment Period (Years)", 1, 30, 10)
+    st.subheader("📈 SIP (Systematic Investment Plan) Calculator")
 
-    # Inflation Settings
-    st.sidebar.markdown("### 📊 Optional Settings")
-    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
-    inflation_rate = 0
-    if use_inflation:
-        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        monthly_investment = st.number_input("Monthly SIP (₹)", min_value=0, value=10000, step=500)
+    with col2:
+        rate = st.number_input("Expected Return Rate (% p.a.)", min_value=0.0, max_value=30.0, value=12.0, step=0.25)
+    with col3:
+        years = st.number_input("Investment Duration (years)", min_value=1, max_value=60, value=15, step=1)
 
-    calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
+    if st.button("Calculate", type="primary", use_container_width=True):
+        # Calculate with new parameters
+        df = calc.sip_calculator(
+            monthly_investment=int(monthly_investment), 
+            rate=float(rate), 
+            years=int(years),
+            inflation_rate=float(inflation_rate),
+            enable_increase=bool(enable_increase),
+            increase_frequency=increase_frequency,
+            increase_percentage=float(increase_percentage) if increase_percentage is not None else 0.0
+        )
 
-    # Main content area
-    st.header("📈 SIP (Systematic Investment Plan) Calculator")
+        # 1. Display summary
+        investment_summary_block(df, calculator_type)
 
-    if calculate_button:
-        st.session_state.sip_calculated = True
-        st.session_state.sip_results = calc.sip_calculator(monthly_investment, rate, years, inflation_rate)
+        # 2. Display growth chart
+        chart_cols = ["Final Amount", "Total Invested"]
+        if enable_inflation and inflation_rate > 0:
+            chart_cols.append("Real Value (Inflation Adjusted)")
 
-    if hasattr(st.session_state, 'sip_calculated') and st.session_state.sip_calculated:
-        results = st.session_state.sip_results
+        st.plotly_chart(
+            create_growth_chart(
+                df, 
+                chart_cols, 
+                "SIP Growth Over Time"
+            ), 
+            use_container_width=True
+        )
 
-        # Summary metrics
-        total_invested = results.iloc[-1]['Total Invested']
-        final_amount = results.iloc[-1]['Final Amount']
-        total_gains = results.iloc[-1]['Gains']
+        # 3. Display data table
+        st.subheader("📈 Year-wise SIP Growth Details")
+        # Remove the index column for cleaner display
+        df_display = df.copy()
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        col2a, col2b, col2c = st.columns(3)
-        with col2a:
-            st.metric("Total Invested", format_currency(total_invested))
-        with col2b:
-            st.metric("Final Amount", format_currency(final_amount))
-        with col2c:
-            st.metric("Total Gains", format_currency(total_gains))
 
-        # Create two columns for charts
-        chart_col1, chart_col2 = st.columns(2)
-
-        with chart_col1:
-            # Growth chart with invested amount
-            fig_growth = create_growth_chart_with_investment(results, 'Final Amount', 'Total Invested', 'SIP Growth: Portfolio vs Invested Amount')
-            st.plotly_chart(fig_growth, use_container_width=True)
-
-        with chart_col2:
-            # Pie chart
-            fig_pie = create_pie_chart(total_invested, total_gains, 'SIP Investment Breakdown')
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        # Results table
-        st.subheader("Detailed Breakdown")
-        display_cols = ['Period', 'Year', 'Total Invested', 'Final Amount', 'Gains', 'Gains Percent']
-        if inflation_rate > 0:
-            display_cols.append('Real Value (Inflation Adjusted)')
-        st.dataframe(results[display_cols], use_container_width=True)
-    else:
-        st.info("👈 Please enter your SIP parameters in the sidebar and click 'Calculate' to see results.")
-
-# SWP Calculator
 elif calculator_type == "SWP Calculator":
-    # Sidebar inputs
-    st.sidebar.markdown("### 💸 Input Parameters")
-    initial_amount = st.sidebar.number_input("Initial Investment (₹)", min_value=100000, value=1000000, step=10000)
-    withdrawal_amount = st.sidebar.number_input("Monthly Withdrawal (₹)", min_value=1000, value=10000, step=1000)
-    rate = st.sidebar.number_input("Expected Annual Return (%)", min_value=1.0, max_value=30.0, value=10.0, step=0.1)
-    years = st.sidebar.slider("Withdrawal Period (Years)", 1, 30, 15)
+    st.subheader("💸 SWP (Systematic Withdrawal Plan) Calculator")
 
-    # Inflation Settings
-    st.sidebar.markdown("### 📊 Optional Settings")
-    use_inflation = st.sidebar.checkbox("Apply Inflation Adjustment")
-    inflation_rate = 0
-    if use_inflation:
-        inflation_rate = st.sidebar.slider("Inflation Rate (%)", 0.0, 15.0, 6.0, 0.1)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        initial_amount = st.number_input("Initial Corpus (₹)", min_value=0, value=1000000, step=10000)
+    with col2:
+        withdrawal_amount = st.number_input("Monthly Withdrawal (₹)", min_value=0, value=10000, step=500)
+    with col3:
+        rate = st.number_input("Expected Return Rate (% p.a.)", min_value=0.0, max_value=30.0, value=12.0, step=0.25)
+    with col1:
+        years = st.number_input("Duration (years)", min_value=1, max_value=60, value=10, step=1)
 
-    calculate_button = st.sidebar.button("Calculate", type="primary", use_container_width=True)
+    if st.button("Calculate", type="primary", use_container_width=True):
+        # Calculate with new parameters
+        df = calc.swp_calculator(
+            initial_amount=int(initial_amount), 
+            withdrawal_amount=int(withdrawal_amount),
+            rate=float(rate), 
+            years=int(years), 
+            inflation_rate=float(inflation_rate),
+            enable_increase=bool(enable_increase),
+            increase_frequency=increase_frequency,
+            increase_percentage=float(increase_percentage) if increase_percentage is not None else 0.0
+        )
 
-    # Main content area
-    st.header("💸 SWP (Systematic Withdrawal Plan) Calculator")
+        # 1. Display summary
+        investment_summary_block(df, calculator_type)
 
-    if calculate_button:
-        st.session_state.swp_calculated = True
-        st.session_state.swp_results = calc.swp_calculator(initial_amount, withdrawal_amount, rate, years, inflation_rate)
-        st.session_state.swp_initial = initial_amount
+        # 2. Display growth chart
+        chart_cols = ["Remaining Balance", "Total Withdrawn"]
+        if enable_inflation and inflation_rate > 0:
+            chart_cols.append("Real Balance (Inflation Adjusted)")
 
-    if hasattr(st.session_state, 'swp_calculated') and st.session_state.swp_calculated:
-        results = st.session_state.swp_results
-        initial_amount = st.session_state.swp_initial
+        st.plotly_chart(
+            create_growth_chart(
+                df, 
+                chart_cols, 
+                "SWP Balance Over Time"
+            ), 
+            use_container_width=True
+        )
 
-        # Summary metrics
-        if len(results) > 0:
-            final_balance = results.iloc[-1]['Remaining Balance']
-            total_withdrawn = results.iloc[-1]['Total Withdrawn']
-            years_lasted = len(results)
+        # 3. Display data table
+        st.subheader("📈 Year-wise SWP Details")
+        # Remove the index column for cleaner display
+        df_display = df.copy()
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-            col2a, col2b, col2c = st.columns(3)
-            with col2a:
-                st.metric("Remaining Balance", format_currency(final_balance))
-            with col2b:
-                st.metric("Total Withdrawn", format_currency(total_withdrawn))
-            with col2c:
-                st.metric("Years Lasted", f"{years_lasted} years")
-
-            # Create two columns for charts
-            chart_col1, chart_col2 = st.columns(2)
-
-            with chart_col1:
-                # Balance chart
-                fig_growth = create_growth_chart_with_investment(results, 'Remaining Balance', None, 'SWP: Remaining Balance Over Time')
-                st.plotly_chart(fig_growth, use_container_width=True)
-
-            with chart_col2:
-                # Pie chart for remaining vs withdrawn
-                fig_pie = create_swp_pie_chart(final_balance, total_withdrawn, 'SWP Distribution')
-                st.plotly_chart(fig_pie, use_container_width=True)
-
-            # Results table
-            st.subheader("Detailed Breakdown")
-            display_cols = ['Period', 'Year', 'Remaining Balance', 'Annual Withdrawn', 'Total Withdrawn']
-            if inflation_rate > 0:
-                display_cols.append('Real Balance (Inflation Adjusted)')
-            st.dataframe(results[display_cols], use_container_width=True)
-    else:
-        st.info("👈 Please enter your SWP parameters in the sidebar and click 'Calculate' to see results.")
 
 # Footer
 st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #666666;'>
-        <p>💡 <strong>Disclaimer:</strong> This calculator provides estimates based on assumed rates of return. 
-        Actual returns may vary. Please consult with a financial advisor for investment decisions.</p>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
+st.markdown("""
+📝 **Note:** 
+- Step-up increases for SIP/SWP apply at the start of the triggered year and compound thereafter
+- One-time additional contributions are added at the start of triggered years
+- All calculations assume monthly compounding for SIP/SWP
+- Inflation adjustment shows the real purchasing power of your investments
+- For "Every 3 years" frequency: increases happen in years 3, 6, 9, etc.
+- For "Every 5 years" frequency: increases happen in years 5, 10, 15, etc.
+""")
