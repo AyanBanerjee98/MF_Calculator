@@ -30,7 +30,7 @@ st.sidebar.markdown("---")
 
 # Optional Settings
 with st.sidebar.expander("Optional: Adjust Inflation & CAGR"):
-    enable_inflation = st.checkbox("Enable Inflation Adjustment", value=False)
+    enable_inflation = st.checkbox("Enable inflation adjustment", value=False)
     inflation_rate = st.number_input("Inflation rate (% per year)", min_value=0.0, max_value=20.0, value=6.0, step=0.25, disabled=not enable_inflation)
 
 with st.sidebar.expander("Optional: Step-up Investment/Withdrawal", expanded=False):
